@@ -1,3 +1,5 @@
+
+
 const userModel = require('../models/user.model');
 const jwt = require('jsonwebtoken');
 
@@ -10,8 +12,6 @@ const authUser = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
-        // Check if token is expired (jwt.verify handles this automatically)
         const user = await userModel.findById(decoded.id).select("-password");
         
         if (!user) {
@@ -21,13 +21,12 @@ const authUser = async (req, res, next) => {
         req.user = user;
         next();
     } catch (err) {
-        // Handle specific JWT errors
         if (err.name === 'TokenExpiredError') {
-            // Clear expired cookie
+            // FIXED COOKIE CLEARING
             res.clearCookie("token", {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict'
+                secure: true,
+                sameSite: 'none'
             })
             return res.status(401).json({ message: "Token expired, please login again" })
         }

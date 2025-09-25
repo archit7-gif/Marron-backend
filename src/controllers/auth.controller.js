@@ -1,12 +1,12 @@
 
 
+
 const userModel = require("../models/user.model")
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 
 // Password validation function
 const validatePassword = (password) => {
-    // At least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/;
     return regex.test(password);
 }
@@ -18,7 +18,6 @@ const registerUser = async(req,res)=>{
         return res.status(400).json({ message: "Provide required details"});
     }
 
-    // Password validation
     if (!validatePassword(password)) {
         return res.status(400).json({ 
             message: "Password must be 8-20 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)" 
@@ -30,7 +29,6 @@ const registerUser = async(req,res)=>{
         return res.status(400).json({ message : "User already exists"})
     }
 
-    // Hashing password
     const HashPassword = await bcrypt.hash(password,10)
     const user = await userModel.create({
         fullname : {firstname , lastname }, 
@@ -38,19 +36,18 @@ const registerUser = async(req,res)=>{
         password : HashPassword
     })
 
-    // Token with expiry (24 hours)
     const token = jwt.sign(
         {id: user._id}, 
         process.env.JWT_SECRET, 
         { expiresIn: '24h' }
     )
 
-    // Secure cookie options
+    // FIXED COOKIE OPTIONS FOR PRODUCTION
     const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+        secure: true, // Always true for HTTPS
+        sameSite: 'none', // CRITICAL: Allow cross-domain cookies
+        maxAge: 24 * 60 * 60 * 1000
     }
 
     res.cookie("token", token, cookieOptions)
@@ -64,7 +61,6 @@ const registerUser = async(req,res)=>{
     })
 }
 
-// FIXED LOGIN FUNCTION WITH PROPER STATUS CODES
 const loginUser = async(req,res)=>{
     const { email ,password } = req.body
     
@@ -72,31 +68,28 @@ const loginUser = async(req,res)=>{
         return res.status(400).json({ message: "Please provide email and password" })
     }
 
-    // STEP 1: Check if user exists - 404 if not found
     const user = await userModel.findOne({ email })
     if(!user){
         return res.status(404).json({ message: "User Not Found. Please register first." })
     }
 
-    // STEP 2: Check password - 401 if incorrect
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
         return res.status(401).json({ message: "Invalid Credentials." })
     }
 
-    // SUCCESS: Generate token and login
     const token = jwt.sign(
         {id: user._id}, 
         process.env.JWT_SECRET, 
         { expiresIn: '24h' }
     )
 
-    // Secure cookie options
+    // FIXED COOKIE OPTIONS FOR PRODUCTION
     const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+        secure: true, // Always true for HTTPS
+        sameSite: 'none', // CRITICAL: Allow cross-domain cookies
+        maxAge: 24 * 60 * 60 * 1000
     }
 
     res.cookie("token", token, cookieOptions)
@@ -112,11 +105,11 @@ const loginUser = async(req,res)=>{
 
 const logoutUser = async(req,res)=>{
     try {
-        // Clear the cookie
+        // FIXED LOGOUT COOKIE CLEARING
         res.clearCookie("token", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
+            secure: true,
+            sameSite: 'none'
         })
         
         res.status(200).json({
